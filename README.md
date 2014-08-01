@@ -1,4 +1,4 @@
-#GuanShui
+#GuanShui (灌水)　http://guanshui.noip.me/wchat/
 
 Guan Shui BBS
 
