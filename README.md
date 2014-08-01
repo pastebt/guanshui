@@ -1,6 +1,8 @@
-#GuanShui (灌水)　http://guanshui.noip.me/wchat/
+#GuanShui (灌水)
 
 Guan Shui BBS
+
+http://guanshui.noip.me/wchat/
 
 ## Build
 
