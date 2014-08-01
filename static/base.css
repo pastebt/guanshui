@@ -1,0 +1,39 @@
+div.banner{	/* Navigate bar in list page */
+	margin: 0;
+	position: absolute;
+	position: fixed;
+	top: 0.1em;
+	right: 0.5em;
+/*	float: right;*/
+	}
+div.banner a:link { text-decoration: none; color: blue }
+div.banner a:visited { text-decoration: none; color: blue }
+
+div.msg_subject{margin: 0}
+div.msg_subject a:link { text-decoration: none; color: blue }
+/*
+div.msg_subject a:visited { text-decoration: none; color: blue }
+div.msg_deleted {text-decoration: line-through}
+*/
+div.msg_subject a:visited { text-decoration: none}
+div.msg_subject a:hover { text-decoration: underline; color: blue}
+
+div.body{ 
+	margin: 0.5em;
+	margin-left: 1.6em;
+	width: 85%;
+	}
+.uname{
+	font-weight: bolder;
+	}
+
+div.pb	{ 	/* Navigate bar in post page */
+	margin: 0;
+	float:	right;
+	}
+div.pb a:link { text-decoration: none; color: blue }
+div.pb a:visited { text-decoration: none; color: blue }
+/*
+div.pb a:hover { text-decoration: underline; color: blue }
+*/
+

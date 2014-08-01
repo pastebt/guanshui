@@ -1,0 +1,16 @@
+{
+"port_http": "8080",
+"port_https": "4430",
+"htdoc": "/opt/guanshui",
+"path_tpl": "/tpl/",
+"path_sess": "/sess/",
+"path_static": "/static/",
+"path_attach": "/atta/",
+"cert.pem": "/etc/ssl/certs/ssl-cert-snakeoil.pem",
+"key.pem": "/etc/ssl/private/ssl-cert-snakeoil.key",
+"list_num": "20",
+"db_name": "dbname",
+"db_user": "dbuser",
+"db_pass": "dbuserpassword"
+"log_file": "guanshui.log"
+}
