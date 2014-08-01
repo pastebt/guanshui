@@ -2,8 +2,6 @@
 
 Guan Shui BBS
 
-http://guanshui.noip.me/wchat/
-
 ## Build
 
 After install and setup golang
