@@ -11,6 +11,7 @@
 "list_num": "20",
 "db_name": "dbname",
 "db_user": "dbuser",
-"db_pass": "dbuserpassword"
-"log_file": "guanshui.log"
+"db_pass": "dbuserpassword",
+"log_file": "guanshui.log",
+"log_level": "debug"
 }
