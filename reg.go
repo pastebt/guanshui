@@ -9,14 +9,7 @@ import (
 
 func update(name, pwd, np1, np2, mail string) (msg string) {
     if np1 != np2 { return "err: password not match" }
-    /*
-    db, err := connect()
-    if err != nil {
-        logging.Error(err)
-        return
-    }
-    defer db.Close()
-    */
+
     uo, err := queryUser(name)
     if err != nil {
         logging.Error(err)
@@ -38,14 +31,7 @@ func update(name, pwd, np1, np2, mail string) (msg string) {
 
 func reg(name, np1, np2, mail string) (msg string) {
     if np1 != np2 { return "err: password not match" }
-    /*
-    db, err := connect()
-    if err != nil {
-        logging.Error(err)
-        return
-    }
-    defer db.Close()
-    */
+
     uo := &User{name:name, mail:mail}
     uo.genSalt()
     uo.pass = uo.calPwd(np1)

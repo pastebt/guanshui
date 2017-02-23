@@ -10,8 +10,6 @@ import (
     "crypto/md5"
     "crypto/rand"
     "html/template"
-    //"github.com/ziutek/mymysql/mysql"
-    //_ "github.com/ziutek/mymysql/thrsafe"
     "database/sql"
   _ "github.com/go-sql-driver/mysql"
 )
@@ -21,18 +19,6 @@ var (
     db  *sql.DB
 )
 
-/*
-func connect() (db mysql.Conn, err error) {
-    db = mysql.New("tcp", "", "127.0.0.1:3306",
-                   cfg["db_user"], cfg["db_pass"], cfg["db_name"])
-    db.Register("set names 'utf8'")
-    err = db.Connect()
-    if err != nil {
-        panic(err)
-    }
-    return
-}
-*/
 
 const (
     DATATB string = "gsdata"
@@ -75,7 +61,6 @@ func getTopThreadId(l *list) (ts []int64, err error) {
     ts = make([]int64, 0, l.num + 1)
     var who string = "thread"
     if l.Last { who = "newest" }
-    //var rows []mysql.Row
     w := ""
     if l.first > 0 { w = fmt.Sprintf("where %s <= %d", who, l.first) }
     rows, err := db.Query(fmt.Sprintf("select thread, %s from %s %s " +
@@ -106,24 +91,6 @@ func getTopThreadId(l *list) (ts []int64, err error) {
     return
 }
 
-/*
-func fillPost(p *post, row *sql.Row, res mysql.Result) (err error) {
-    flag := row.Int(res.Map("flag"))
-    p.Cle = row.Int64(res.Map("postid"))
-    p.Sub = row.Str(res.Map("subject"))
-    p.Who = row.Str(res.Map("name"))
-    p.Uid = row.Int(res.Map("user"))
-    p.Size = row.Int64(res.Map("size"))
-    p.Del = flag > 0x7f
-    p.Cool = make([]byte, flag & 0x1f)
-    p.Visit = row.Int(res.Map("visit")) - 1
-    p.When = row.Localtime(res.Map("date")).Format("2006/01/02-15:04:05")
-    p.Afile = row.Str(res.Map("afile"))
-    ln := strings.ToLower(p.Afile)
-    p.IsPic = strings.HasSuffix(ln, ".jpg") || strings.HasSuffix(ln, ".png") || strings.HasSuffix(ln, ".gif")
-    return
-}
-*/
 
 func fixPost(p *post, flag int, date *time.Time, tow *sql.NullString) {
     p.Del = flag > 0x7f
@@ -171,13 +138,9 @@ func getList(l *list) (err error) {
                 continue
             }
             fixPost(p, flag, &date, &tow)
-            //p.Uid = row.Int(res.Map("user"))
-            //p.Tid = row.Int(res.Map("only"))
-            //if p.Tid > 0 { p.Tow = row.Str(res.Map("tow")) }
             if p.Tid == l.LoginId || p.Uid == l.LoginId { p.Tid = 0 }
             p.IsNew = p.Cle > l.lastcle
             m[p.Cle] = p
-            //p.Parent = row.Int64(res.Map("parent"))
             pa := m[p.Parent]
             pa.Children = append(pa.Children, p)
         }
@@ -359,19 +322,6 @@ func (uo *User)calPwd(pwd string) (p string){
 
 
 func queryUser(name string) (uobj *User, err error) {
-    /*
-    stmt, err := db.Prepare(fmt.Sprintf("select * from %s where name=?", USERTB))
-    if err != nil { return }
-    row, res, err := stmt.ExecFirst(name)
-    if err != nil { return }
-    uobj = &User{name:name}
-    if len(row) == 0 { return }
-    uobj.uid = row.Int(res.Map("id"))
-    uobj.name = row.Str(res.Map("name"))
-    uobj.salt = row.Str(res.Map("salt"))
-    uobj.pass = row.Str(res.Map("pwd"))
-    uobj.mail = row.Str(res.Map("mail"))
-    */
     uobj = &User{}
     err = db.QueryRow("select id, name, salt, pwd, mail from " + USERTB +
                       " where name=?", name).Scan(&uobj.uid, &uobj.name,

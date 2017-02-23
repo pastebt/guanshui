@@ -2,9 +2,7 @@ package main
 
 import (
     "os"
-//    "fmt"
     "path"
-//    "path/filepath"
     "strings"
     "net/http"
 )
