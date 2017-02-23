@@ -9,13 +9,15 @@ import (
 
 func update(name, pwd, np1, np2, mail string) (msg string) {
     if np1 != np2 { return "err: password not match" }
+    /*
     db, err := connect()
     if err != nil {
         logging.Error(err)
         return
     }
     defer db.Close()
-    uo, err := queryUser(db, name)
+    */
+    uo, err := queryUser(name)
     if err != nil {
         logging.Error(err)
         return
@@ -25,7 +27,7 @@ func update(name, pwd, np1, np2, mail string) (msg string) {
     uo.genSalt()
     uo.pass = uo.calPwd(np1)
     if mail != "" { uo.mail = mail }
-    err = uo.updatePSE(db)
+    err = uo.updatePSE()
     if err != nil {
         logging.Error(err)
         return "err: failed update"
@@ -36,17 +38,18 @@ func update(name, pwd, np1, np2, mail string) (msg string) {
 
 func reg(name, np1, np2, mail string) (msg string) {
     if np1 != np2 { return "err: password not match" }
+    /*
     db, err := connect()
     if err != nil {
         logging.Error(err)
         return
     }
     defer db.Close()
-
+    */
     uo := &User{name:name, mail:mail}
     uo.genSalt()
     uo.pass = uo.calPwd(np1)
-    err = uo.SaveNew(db)
+    err := uo.SaveNew()
     if err != nil {
         logging.Error(err)
         return "err: failed"

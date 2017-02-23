@@ -10,11 +10,18 @@ import (
     "crypto/md5"
     "crypto/rand"
     "html/template"
-    "github.com/ziutek/mymysql/mysql"
-    _ "github.com/ziutek/mymysql/thrsafe"
+    //"github.com/ziutek/mymysql/mysql"
+    //_ "github.com/ziutek/mymysql/thrsafe"
+    "database/sql"
+  _ "github.com/go-sql-driver/mysql"
 )
 
 
+var (
+    db  *sql.DB
+)
+
+/*
 func connect() (db mysql.Conn, err error) {
     db = mysql.New("tcp", "", "127.0.0.1:3306",
                    cfg["db_user"], cfg["db_pass"], cfg["db_name"])
@@ -23,8 +30,9 @@ func connect() (db mysql.Conn, err error) {
     if err != nil {
         panic(err)
     }
+    return
 }
-
+*/
 
 const (
     DATATB string = "gsdata"
@@ -33,52 +41,73 @@ const (
 )
 
 
-func getSummary(db mysql.Conn, add bool) (t, v, a int, err error) {
-    if add {
-        db.Query("update %s set visit = visit + 1 where postid=1", DATATB)
-    }
-    rows, _, err := db.Query("select count(*) from %s union " +
-                             "select visit from %s where postid=1 union " +
-                             "select count(*) from %s where (last + 2 * 60) > now()",
-                             DATATB, DATATB, USERTB)
-    if err != nil { return }
-    return rows[0].Int(0), rows[1].Int(0), rows[2].Int(0), nil
+func initDB() {
+    var err error
+    //n := cfg.GetIntDefault("db_conn", 3)
+    n := 3
+    if n < 3 { n = 3 }
+    host := "127.0.0.1:3306"
+    name := cfg["db_name"]
+    user := cfg["db_user"]
+    pass := cfg["db_pass"]
+    db, err = sql.Open("mysql",
+                       user + ":" + pass + "@tcp(" + host + ")/" + name +
+                       "?allowOldPasswords=1&parseTime=1&autocommit=true")
+    if err != nil { panic(err) }
+    db.SetMaxIdleConns(n)
+    db.SetMaxOpenConns(n)
 }
 
 
-func getTopThreadId(db mysql.Conn, l *list) (ts []int64, err error) {
-    ts = make([]int64, 0, l.num + 1)
-    var who string = "thread"
-    if l.Last { who = "newest" }
-    var rows []mysql.Row
-    w := ""
-    if l.first > 0 { w = fmt.Sprintf("where %s <= %d", who, l.first) }
-    rows, _, err = db.Query("select thread, %s from %s %s " +
-                            "order by %s desc limit %d",
-                            who, LASTTB, w, who, l.num + 1)
-    if err != nil { return }
-
-    if len(rows) > l.num {
-        rows = rows[:l.num]
-        l.Right = rows[l.num - 1].Int64(1)
+func getSummary(add bool) (t, v, a int, err error) {
+    if add {
+        db.Exec("update " + DATATB + " set visit = visit + 1 where postid=1")
     }
-    for _, row := range rows {
-        ts = append(ts, row.Int64(0))
-    }
-    if l.first > 0 {
-        // may need left
-        rows, _, err = db.Query("select %s from %s where %s >= %d " +
-                                "order by %s limit %d",
-                                who, LASTTB, who, l.first, who, l.num)
-        if err == nil && len(rows) > 1 {
-            l.Left = rows[len(rows) - 1].Int64(0)
-        }
-    }
+    err = db.QueryRow("select count(*) from " + DATATB + " union " +
+                      "select visit from " + DATATB + " where postid=1 union " +
+                      "select count(*) from " + DATATB +
+                      " where (last + 2 * 60) > now()").Scan(&t, &v, &a)
     return
 }
 
 
-func fillPost(p *post, row *mysql.Row, res mysql.Result) (err error) {
+func getTopThreadId(l *list) (ts []int64, err error) {
+    ts = make([]int64, 0, l.num + 1)
+    var who string = "thread"
+    if l.Last { who = "newest" }
+    //var rows []mysql.Row
+    w := ""
+    if l.first > 0 { w = fmt.Sprintf("where %s <= %d", who, l.first) }
+    rows, err := db.Query(fmt.Sprintf("select thread, %s from %s %s " +
+                                      "order by %s desc limit %d",
+                                      who, LASTTB, w, who, l.num + 1))
+    if err != nil { return }
+    defer rows.Close()
+    for rows.Next() {
+        var i int64
+        if err = rows.Scan(&i); err != nil { return }
+        ts = append(ts, i)
+    }
+
+    if len(ts) > l.num {
+        ts = ts[:l.num]
+        l.Right = ts[l.num - 1]
+    }
+    if l.first <= 0 { return }
+    // may need left
+    rs, err := db.Query(fmt.Sprintf("select %s from %s where %s >= %d " +
+                                    "order by %s limit %d",
+                                    who, LASTTB, who, l.first, who, l.num))
+    if err != nil { return }
+    defer rs.Close()
+    for rs.Next() {
+        if err = rs.Scan(&l.Left); err != nil { return }
+    }
+    return
+}
+
+/*
+func fillPost(p *post, row *sql.Row, res mysql.Result) (err error) {
     flag := row.Int(res.Map("flag"))
     p.Cle = row.Int64(res.Map("postid"))
     p.Sub = row.Str(res.Map("subject"))
@@ -94,39 +123,65 @@ func fillPost(p *post, row *mysql.Row, res mysql.Result) (err error) {
     p.IsPic = strings.HasSuffix(ln, ".jpg") || strings.HasSuffix(ln, ".png") || strings.HasSuffix(ln, ".gif")
     return
 }
+*/
+
+func fixPost(p *post, flag int, date *time.Time, tow *sql.NullString) {
+    p.Del = flag > 0x7f
+    p.Cool = make([]byte, flag & 0x1f)
+    if date != nil {
+        p.When = date.Format("2006/01/02-15:04:05")
+    }
+    if tow != nil {
+        p.Tow = tow.String
+    }
+    ln := strings.ToLower(p.Afile)
+    p.IsPic = strings.HasSuffix(ln, ".jpg") || strings.HasSuffix(ln, ".png") || strings.HasSuffix(ln, ".gif")
+}
 
 
-func getList(db mysql.Conn, l *list) (err error) {
+func getList(l *list) (err error) {
     m := make(map[int64]*post)
     m[0] = &post{Children:make([]*post, 0, l.num)}
 
-    l.TotalNum, l.VisitCnt, l.ActiveCnt, err = getSummary(db, l.first == 0)
+    l.TotalNum, l.VisitCnt, l.ActiveCnt, err = getSummary(l.first == 0)
     if err != nil { return }
 
-    ts, err := getTopThreadId(db, l)
+    ts, err := getTopThreadId(l)
     if err != nil { return }
     for _, t := range ts {
-        rows, res, e := db.Query("select postid, subject, parent, size, " +
-                                 "  visit, flag, date, user, u.name as name," +
-                                 "  only, t.name as tow, afile " +
-                                 "from %s d left join %s u on d.user=u.id " +
-                                 "  left join  %s t on d.only=t.id " +
-                                 "where thread=%d order by postid",
-                                 DATATB, USERTB, USERTB, t)
-        if e != nil { return e }
-        for _, row := range rows {
+        var rows *sql.Rows
+        var date time.Time
+        var flag int
+        var tow sql.NullString
+        rows, err = db.Query("select postid, subject, parent, size, " +
+                             "  visit, flag, date, user, u.name as name," +
+                             "  only, t.name as tow, afile " +
+                             "from " + DATATB + " d left join " + USERTB +
+                             " u on d.user=u.id left join " + USERTB +
+                             " t on d.only=t.id where thread=? " +
+                             "order by postid", t)
+        if err != nil { return }
+        for rows.Next() {
             p := &post{Children:make([]*post, 0)}
-            fillPost(p, &row, res)
-            p.Uid = row.Int(res.Map("user"))
-            p.Tid = row.Int(res.Map("only"))
-            if p.Tid > 0 { p.Tow = row.Str(res.Map("tow")) }
+            err = rows.Scan(&p.Cle, &p.Sub, &p.Parent, &p.Size,
+                            &p.Visit, &flag, &date, &p.Uid, &p.Who,
+                            &p.Tid, &tow, &p.Afile)
+            if err != nil {
+                // TODO log error
+                continue
+            }
+            fixPost(p, flag, &date, &tow)
+            //p.Uid = row.Int(res.Map("user"))
+            //p.Tid = row.Int(res.Map("only"))
+            //if p.Tid > 0 { p.Tow = row.Str(res.Map("tow")) }
             if p.Tid == l.LoginId || p.Uid == l.LoginId { p.Tid = 0 }
             p.IsNew = p.Cle > l.lastcle
             m[p.Cle] = p
-            p.Parent = row.Int64(res.Map("parent"))
+            //p.Parent = row.Int64(res.Map("parent"))
             pa := m[p.Parent]
             pa.Children = append(pa.Children, p)
         }
+        rows.Close()
     }
     l.Posts = m[0].Children
     return nil
@@ -191,73 +246,81 @@ func procBody(src string) template.HTML {
 }
 
 
-func dbGetPost(db mysql.Conn, cle int64, uid int) (p *post, err error) {
-    row, _, err := db.QueryFirst("select only, name, flag, user " +
-                                 "from %s d left join %s u on d.only=u.id " +
-                                 "where postid=%d", DATATB, USERTB, cle)
-    if err != nil { return }
+func dbGetPost(cle int64, uid int) (p *post, err error) {
     p = &post{Cle: cle, Uid: uid}
-    p.Tid = row.Int(0)
+    flag := 0
+    var tow sql.NullString
+    err = db.QueryRow("select only, flag, user, name from " + DATATB +
+                      " left join " + USERTB + " u on d.only=u.id " +
+                      "where postid=?", cle).Scan(
+                      &p.Tid, &flag, &p.Uid, &tow)
+    if err != nil { return }
     if p.Tid != 0 {
-        logging.Debug("Tid=", p.Tid)
-        p.Tow = row.Str(1)
-        p.Uid = row.Int(3)
+        p.Tow = tow.String
         if uid != p.Tid && uid != p.Uid { return }
     }
-    p.Del = row.Int(2) > 0x7f
+    p.Del = flag > 0x7f
     if p.Del { return }
-    row, res, err := db.QueryFirst("select postid, subject, body, size, " +
-                                   "visit, flag, date, user, name, afile " +
-                                   "from %s d, %s u where d.user=u.id and postid=%d",
-                                   DATATB, USERTB, cle)
+
+    var body string
+    var date time.Time
+    err = db.QueryRow("select subject, body, size, " +
+                      "visit, flag, date, user, name, afile " +
+                      "from " + DATATB + " d, " + USERTB + " u " +
+                      "where d.user=u.id and postid=?", cle).Scan(
+                       &p.Sub, &body, &p.Size, &p.Visit,
+                       &flag, &date, &p.Uid, &tow, &p.Afile)
     if err != nil { return }
     p.Tid = 0   // because p.Tid == 0 or p.Tid == uid
-    fillPost(p, &row, res)
-    p.Body = procBody(row.Str(res.Map("body")))
-    _, _, err = db.Query("update %s set visit = visit + 1 where postid=%d", DATATB, cle)
+    fixPost(p, flag, &date, &tow)
+    p.Body = procBody(body)
+    _, err = db.Exec("update " + DATATB +
+                     " set visit = visit + 1 where postid=?", cle)
     return
 }
 
 
-func dbSavePost(db mysql.Conn, po *post) (err error) {
+func dbSavePost(po *post) (err error) {
     if po.Parent > 1 {
-        row, _, e := db.QueryFirst("select thread from %s where postid=%d",
-                                    DATATB, po.Parent)
-        if e != nil { return e }
-        po.Thread = row.Int64(0)
+        err = db.QueryRow("select thread from " + DATATB +
+                          " where postid=?", po.Parent).Scan(&po.Thread)
+        if err != nil { return }
     }
     if po.Tow != "" {
-        st, e := db.Prepare("select id from " + USERTB + " where name=?")
-        if e != nil { return e }
-        row, _, e := st.ExecFirst(po.Tow)
-        if e != nil { return e }
-        po.Tid = row.Int(0)
+        err = db.QueryRow("select id from " + USERTB +
+                          " where name=?", po.Tow).Scan(&po.Tid)
+        if err != nil { return }
     }
-    stmt, err := db.Prepare("insert into " + DATATB +
-                            "(parent, thread, user, only, subject, size, " +
-                            " body, afile, visit)" +
-                            " values (?, ?, ?, ?, ?, ?, ?, ?, 1)")
+    res, err := db.Exec("insert into " + DATATB +
+                        " (parent, thread, user, only, subject, size, " +
+                        "  body, afile, visit)" +
+                        " values (?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                        po.Parent, po.Thread, po.Uid, po.Tid,
+                        po.Sub, po.Size, po.Body, po.Afile)
     if err != nil { return }
-    _, res, err := stmt.Exec(po.Parent, po.Thread, po.Uid, po.Tid,
-                             po.Sub, po.Size, po.Body, po.Afile)
+
+    po.Cle, err = res.LastInsertId()
     if err != nil { return }
-    po.Cle = int64(res.InsertId())
+
     if po.Parent == 0 {
         po.Thread = po.Cle
-        _, _, err = db.Query("update %s set thread = postid where postid=%d",
-                              DATATB, po.Cle)
+        _, err = db.Exec("update " + DATATB +
+                         " set thread = postid where postid=?", po.Cle)
+        if err != nil { return }
     }
-    _, _, err = db.Query("insert into %s (thread, newest) values (%d, %d) " +
-                         "on duplicate key update newest="+
-                         "if(values(newest) > newest, values(newest), newest)",
-                         LASTTB, po.Thread, po.Cle)
+    _, err = db.Exec("insert into " + LASTTB +
+                     " (thread, newest) values (?, ?) " +
+                     "on duplicate key update newest="+
+                     "if(values(newest) > newest, values(newest), newest)",
+                     po.Thread, po.Cle)
     return
 }
 
 
-func dbSwapDel(db mysql.Conn, cle int64) (err error) {
-    _, _, err = db.Query("update %s set flag=if(flag>127, flag&0x7f, flag|0x80)" +
-                         " where postid=%d", DATATB, cle)
+func dbSwapDel(cle int64) (err error) {
+    _, err = db.Exec("update " + DATATB +
+                     " set flag=if(flag>127, flag&0x7f, flag|0x80)" +
+                     " where postid=?", cle)
     return
 }
 
@@ -295,7 +358,8 @@ func (uo *User)calPwd(pwd string) (p string){
 }
 
 
-func queryUser(db mysql.Conn, name string) (uobj *User, err error) {
+func queryUser(name string) (uobj *User, err error) {
+    /*
     stmt, err := db.Prepare(fmt.Sprintf("select * from %s where name=?", USERTB))
     if err != nil { return }
     row, res, err := stmt.ExecFirst(name)
@@ -307,36 +371,40 @@ func queryUser(db mysql.Conn, name string) (uobj *User, err error) {
     uobj.salt = row.Str(res.Map("salt"))
     uobj.pass = row.Str(res.Map("pwd"))
     uobj.mail = row.Str(res.Map("mail"))
+    */
+    uobj = &User{}
+    err = db.QueryRow("select id, name, salt, pwd, mail from " + USERTB +
+                      " where name=?", name).Scan(&uobj.uid, &uobj.name,
+                      &uobj.salt, &uobj.pass, &uobj.mail)
+    if err != nil { return }
     if uobj.salt == "" {
         // conver old data
         uobj.genSalt()
         p, _ := url.QueryUnescape(uobj.pass)
         uobj.pass = uobj.calPwd(p)
-        err = uobj.updatePSE(db)
+        err = uobj.updatePSE()
         if err != nil { return }
     }
     return
 }
 
 
-func (uobj *User)updatePSE(db mysql.Conn) (err error) {
-    stmt, err := db.Prepare(fmt.Sprintf("update %s set pwd=?, salt=?, mail=? where id=?", USERTB))
-    if err != nil { return }
-    _, _, err = stmt.Exec(uobj.pass, uobj.salt, uobj.mail, uobj.uid)
+func (uobj *User)updatePSE() (err error) {
+    _, err = db.Exec("update " + USERTB +
+                     " set pwd=?, salt=?, mail=? where id=?",
+                     uobj.pass, uobj.salt, uobj.mail, uobj.uid)
     return
 }
 
 
-func (uobj *User)SaveNew(db mysql.Conn) (err error) {
-    stmt, err := db.Prepare(fmt.Sprintf("insert into %s (name, pwd, salt, mail) values (?, ?, ?, ?)", USERTB))
-    if err != nil { return }
-    _, _, err = stmt.Exec(uobj.name, uobj.pass, uobj.salt, uobj.mail)
+func (uobj *User)SaveNew() (err error) {
+    _, err = db.Exec("insert into " + USERTB +
+                     " (name, pwd, salt, mail) values (?, ?, ?, ?)",
+                     uobj.name, uobj.pass, uobj.salt, uobj.mail)
     return
 }
 
 
 func UpdateLast(uid int) {
-    db, err := connect()
-    if err != nil { return }
-    _, _, _ = db.Query("update %s set last=now() where id=%d", USERTB, uid)
+    db.Exec("update " + USERTB + " set last=now() where id=?", uid)
 }

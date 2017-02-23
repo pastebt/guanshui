@@ -106,6 +106,7 @@ func main() {
     switch os.Args[2] {
     case "start":
         initWchat()
+        initDB()
         startSvr()
     case "stop":
         stopSvr()

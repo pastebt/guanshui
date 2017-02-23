@@ -27,12 +27,14 @@ type list struct {
 func hList(w http.ResponseWriter, r *http.Request) {
     i, _ := auth(w, r)
     l := list{LoginId:i}
+    /*
     db, err := connect()
     if err != nil {
         logging.Error(err)
         return
     }
     defer db.Close()
+    */
     l.Last = r.FormValue("new") == "1"
     f, err := strconv.ParseInt(r.FormValue("first"), 10, 64)
     if err == nil {
@@ -47,7 +49,7 @@ func hList(w http.ResponseWriter, r *http.Request) {
 
     l.lastcle = getLastCle(w, r)
 
-    if err = getList(db, &l); err != nil {
+    if err = getList(&l); err != nil {
         logging.Error(err)
     }
 

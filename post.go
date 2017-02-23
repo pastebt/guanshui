@@ -49,15 +49,15 @@ func logIn(w http.ResponseWriter, r *http.Request) bool {
     p := r.FormValue("password")
     if u == "" || p == "" { return false }
     logging.Debug("u=", u, ", p=", p, ", form=", r.PostForm)
-
+    /*
     db, err := connect()
     if err != nil {
         logging.Error(err)
         return false
     }
     defer db.Close()
-
-    uobj, err := queryUser(db, u)
+    */
+    uobj, err := queryUser(u)
     if err != nil {
         logging.Error(err)
         return false
@@ -79,12 +79,14 @@ func savePost(w http.ResponseWriter, r *http.Request) {
     if logIn(w, r) { return }
     uid, name := auth(w, r)
     if uid == 0 { return }
+    /*
     db, err := connect()
     if err != nil {
         logging.Error("user ", name, " post: ", err)
         return
     }
     defer db.Close()
+    */
     delcle := r.FormValue("delcle")
     if delcle != "" {
         cle, err := strconv.ParseInt(delcle, 10, 64)
@@ -92,7 +94,7 @@ func savePost(w http.ResponseWriter, r *http.Request) {
             logging.Error(err)
             return
         }
-        dbSwapDel(db, cle)
+        dbSwapDel(cle)
         postMsg(w, "Done")
         return
     }
@@ -137,7 +139,7 @@ func savePost(w http.ResponseWriter, r *http.Request) {
                 Size: int64(utf8.RuneCountInString(b)),
                 Body: template.HTML(b),
                 Afile: fn}
-    err = dbSavePost(db, po)
+    err = dbSavePost(po)
     if err != nil {
         logging.Error("user ", name, " save post: ", err)
         postMsg(w, "Sorry, something wrong")
@@ -176,13 +178,15 @@ func hPost(w http.ResponseWriter, r *http.Request) {
     uid, name := auth(w, r)
     logging.Debug("hPost, ", uid, ", ", name)
     tpl.ExecuteTemplate(w, "head.tpl", "")
-
+    /*
     db, err := connect()
     if err != nil {
         logging.Error(err)
     } else {
         defer db.Close()
+    */
         var cle int64 = 0
+        var err error
         s := r.FormValue("cle")
         if len(s) > 1 {
             cle, err = strconv.ParseInt(s, 10, 64)
@@ -193,7 +197,7 @@ func hPost(w http.ResponseWriter, r *http.Request) {
         }
         var p *post
         if cle > 0 {
-            p, err = dbGetPost(db, cle, uid)
+            p, err = dbGetPost(cle, uid)
             if err != nil {
                 logging.Error(err)
             }
@@ -205,6 +209,6 @@ func hPost(w http.ResponseWriter, r *http.Request) {
         p.LoginId = uid
         p.LoginName = name
         tpl.ExecuteTemplate(w, "post.tpl", p)
-    }
+    //}
     tpl.ExecuteTemplate(w, "foot.tpl", "")
 }
