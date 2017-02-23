@@ -8,7 +8,7 @@ After install and setup golang
 ```bash
 go get github.com/pastebt/sess
 go get github.com/pastebt/gslog
-go get github.com/ziutek/mymysql/mysql
+go get github.com/go-sql-driver/mysql
 
 go build -o guanshui *.go
 ```
