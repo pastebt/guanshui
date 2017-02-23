@@ -20,9 +20,7 @@ func connect() (db mysql.Conn, err error) {
                    cfg["db_user"], cfg["db_pass"], cfg["db_name"])
     db.Register("set names 'utf8'")
     err = db.Connect()
-    if err != nil {
-        panic(err)
-    }
+    return
 }
 
 
